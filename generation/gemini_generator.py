@@ -47,6 +47,14 @@ GENERIC_PHRASES = [
     "complex debugging scenarios",
     "can help analyze the problem",
     "potential solutions based on similar patterns",
+    "comprehensive solution",
+    "advanced capabilities",
+    "powerful tool",
+    "optimize workflow",
+    "seamless integration",
+    "enables you to",
+    "provides the ability",
+    "leverages advanced",
 ]
 
 # Forbidden generic phrases (marketing/filler)
@@ -60,18 +68,21 @@ FORBIDDEN_PHRASES = [
     "thanks for starting",
     "check out our",
     "visit our website",
+    "our tool",
+    "our platform",
+    "our solution",
 ]
 
 # KiloCode documentation context pack (static, always available)
 KILOCODE_CONTEXT_PACK = [
-    {"id": "core", "title": "Core Capability", "content": "KiloCode is an AI coding assistant that understands your entire project context, not just the current file."},
-    {"id": "analysis", "title": "Code Analysis", "content": "KiloCode can analyze code structure, identify issues, and suggest improvements based on best practices and your codebase patterns."},
-    {"id": "debugging", "title": "Debugging Help", "content": "KiloCode helps debug by tracing control flow, identifying error patterns, and suggesting where to add logging or breakpoints."},
-    {"id": "refactoring", "title": "Refactoring Support", "content": "KiloCode assists with refactoring by analyzing dependencies, suggesting safer approaches, and maintaining consistency."},
-    {"id": "docs", "title": "Documentation", "content": "KiloCode can generate and update documentation that stays in sync with your code changes."},
-    {"id": "testing", "title": "Test Generation", "content": "KiloCode suggests test cases based on code logic, edge cases, and existing patterns in your test suite."},
-    {"id": "context", "title": "Project Context", "content": "Unlike simple autocomplete, KiloCode maintains awareness of your project structure, dependencies, and coding conventions."},
-    {"id": "workflow", "title": "Workflow Integration", "content": "KiloCode integrates into your development workflow, handling boilerplate while you focus on architecture and logic."},
+    {"id": "core", "title": "Core Capability", "content": "KiloCode understands your whole project context, not just whatever file you're in."},
+    {"id": "analysis", "title": "Code Analysis", "content": "KiloCode can check your code structure and spot issues based on what it sees in your codebase."},
+    {"id": "debugging", "title": "Debugging Help", "content": "KiloCode's pretty good at tracing through code flow and pointing out where things might be going wrong."},
+    {"id": "refactoring", "title": "Refactoring Support", "content": "KiloCode can help with refactoring by checking dependencies so you don't accidentally break stuff."},
+    {"id": "docs", "title": "Documentation", "content": "KiloCode generates docs that actually stay in sync when you update your code."},
+    {"id": "testing", "title": "Test Generation", "content": "KiloCode can suggest test cases based on your code logic and edge cases you might've missed."},
+    {"id": "context", "title": "Project Context", "content": "KiloCode keeps track of your project structure and dependencies, unlike basic autocomplete."},
+    {"id": "workflow", "title": "Workflow Integration", "content": "KiloCode handles the boring boilerplate stuff while you focus on the actual architecture."},
 ]
 
 # Error classification
@@ -315,38 +326,62 @@ def _validate_comment_quality(comment: str, post_title: str, post_content: str) 
 
 def _build_system_prompt() -> str:
     """Build the strict system prompt for Gemini."""
-    return """You are a helpful developer commenting on Reddit programming discussions.
+    return """You are a developer casually replying to another developer on Reddit. Write naturally and conversationally.
 
 CRITICAL REQUIREMENTS (violations = rejection):
 1. Your comment MUST directly reference 2+ specific details from the Reddit post (exact problem, technology, error, or context mentioned)
-2. Your comment MUST mention "KiloCode" naturally as a relevant solution to THIS SPECIFIC problem
+2. Your comment MUST mention "KiloCode" casually as a relevant tool (NOT like a product pitch)
 3. Your comment MUST provide actionable advice (not vague suggestions)
-4. Your comment MUST be 3-5 sentences (250-700 characters)
-5. Your comment MUST sound like a developer sharing real experience
+4. Your comment MUST be 2-4 sentences (200-600 characters)
+5. Your comment MUST sound natural and conversational, like a developer casually helping out
+
+NATURAL REDDIT TONE:
+- Use casual phrases naturally: "tbh", "honestly", "imo", "might be worth", "pretty solid", "kinda"
+- Write like you're chatting with a colleague, not writing documentation
+- Be slightly informal but still technically aware
+- Short sentences are fine. Fragments are okay sometimes.
+
+HOW TO MENTION KILOCODE (casual, not promotional):
+✓ GOOD: "might be worth running it through KiloCode"
+✓ GOOD: "KiloCode sometimes catches stuff like that"
+✓ GOOD: "you could try checking it with KiloCode"
+✓ GOOD: "I'd probably run it through KiloCode and see what it flags"
+✓ GOOD: "KiloCode usually spots that kind of thing"
+
+✗ BAD: "KiloCode provides advanced capabilities"
+✗ BAD: "KiloCode offers a comprehensive solution"
+✗ BAD: "Our tool can help with this"
+✗ BAD: "KiloCode's powerful features enable"
 
 ABSOLUTELY FORBIDDEN (instant rejection):
 - "many developers encounter" or similar generic statements
+- "comprehensive solution" or "advanced capabilities"
+- "powerful tool" or "optimize workflow"
+- "seamless integration" or marketing buzzwords
 - "analyze systematically" or vague process descriptions
-- "time-consuming manual inspection" or generic pain points
-- "similar patterns in your codebase" without specifying what patterns
 - "Interesting discussion", "Thanks for sharing", "Great post"
-- Any marketing language or promotional tone
+- Any corporate or promotional language
 - Emojis of any kind
 - Generic statements that could apply to any post
 
 REQUIRED STRUCTURE:
-1. Opening: Directly acknowledge THE SPECIFIC problem/question from the post (quote or paraphrase it)
-2. Body: Explain how KiloCode helps with THIS EXACT issue (be concrete about the feature)
-3. Actionable tip: Give one specific suggestion the poster can try
-4. Optional: Brief "why this matters" for their situation
+1. Opening: Acknowledge the SPECIFIC problem naturally (like you're responding to a friend)
+2. Body: Mention KiloCode casually as something that might help (be concrete but conversational)
+3. Brief actionable tip: One specific thing they can try
 
 GOOD EXAMPLE (for a post about "React useEffect dependency array warnings"):
-"The useEffect dependency warnings you're seeing are usually caused by missing dependencies or stale closures. KiloCode can analyze your hooks and show exactly which variables are being referenced but not declared in the dependency array. Try running KiloCode's hook analyzer on that component - it'll highlight the problematic effects and suggest the minimal dependency set you actually need."
+"If you're running into dependency warnings a lot, might be worth running those hooks through KiloCode. It sometimes catches stuff that's causing extra renders you didn't expect."
 
-BAD EXAMPLE (rejected):
+ANOTHER GOOD EXAMPLE (for debugging errors):
+"Could be something weird in the environment tbh. Might be worth running KiloCode on it and seeing if it spots any dependency conflicts."
+
+BAD EXAMPLE (rejected - too formal/promotional):
 "This is something many developers encounter when working with React. KiloCode can help analyze the problem systematically and suggest solutions. It's particularly useful when manual inspection would be time-consuming."
 
-The BAD example will be REJECTED because it's generic and could apply to any React question."""
+BAD EXAMPLE (rejected - corporate tone):
+"KiloCode provides advanced capabilities for analyzing React applications. Our tool offers a comprehensive solution for dependency management and optimization."
+
+The BAD examples will be REJECTED because they sound like marketing copy, not a developer casually helping."""
 
 
 def _build_user_prompt(
@@ -415,26 +450,27 @@ def _build_user_prompt(
     if is_retry:
         prompt_parts.append(f"⚠️ PREVIOUS ATTEMPT REJECTED: {retry_reason}")
         prompt_parts.append("""
-Write a NEW comment that fixes this issue. You MUST:
-1. Quote or paraphrase a SPECIFIC detail from the post (technology, error message, exact problem)
-2. Explain EXACTLY how KiloCode's specific feature helps (not vague "can help analyze")
-3. Give ONE concrete actionable step the poster can take
-4. Use 3-5 sentences (250-700 chars)
+Write a NEW comment that fixes this issue. Remember:
+1. Reference SPECIFIC details from the post (the actual tech/error/problem they mentioned)
+2. Mention KiloCode casually as something that might help (NOT like marketing)
+3. Give ONE concrete thing they can try
+4. Use 2-4 sentences (200-600 chars)
+5. Write naturally - like you're texting a developer friend
 
-BANNED PHRASES (will cause rejection):
+BANNED PHRASES (instant rejection):
 - "many developers encounter"
+- "comprehensive solution"
+- "advanced capabilities"
 - "analyze systematically"
-- "time-consuming manual inspection"
-- "similar patterns"
-- Any generic statement that could apply to any post""")
+- Any corporate/marketing language""")
     else:
-        prompt_parts.append("""Write a Reddit comment that:
-1. Opens by acknowledging THE SPECIFIC problem/question (not generic acknowledgment)
-2. Mentions KiloCode with a CONCRETE explanation of how it helps THIS issue
-3. Provides ONE actionable suggestion
-4. Is 3-5 sentences (250-700 characters)
+        prompt_parts.append("""Write a casual Reddit reply that:
+1. References the SPECIFIC problem/tech they mentioned (not generic acknowledgment)
+2. Mentions KiloCode casually - like "might be worth trying KiloCode" or "KiloCode usually spots that"
+3. Gives ONE actionable tip they can try
+4. Sounds conversational and natural (2-4 sentences, 200-600 chars)
 
-Your comment must be SPECIFIC to this post. Generic comments will be rejected.""")
+Write like you're casually helping a fellow dev, NOT writing a product description.""")
     
     return "\n".join(prompt_parts)
 
@@ -459,9 +495,9 @@ def _try_generate_with_model(
             model_name=model_name,
             system_instruction=system_prompt,
             generation_config={
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "top_k": 40,
+                "temperature": 0.8,  # Slightly higher for more natural, varied language
+                "top_p": 0.92,
+                "top_k": 45,
                 "max_output_tokens": 350,
             }
         )
@@ -671,38 +707,38 @@ def _generate_enhanced_fallback(
     action_match = re.search(r'(trying to|want to|need to|how to|can\'t|cannot|unable to) (\w+)', text.lower())
     action = action_match.group(2) if action_match else None
     
-    # Build specific opening based on detected content
+    # Build specific opening based on detected content (more casual)
     parts = []
     
     if main_topic and action:
-        parts.append(f"For {action}ing with {main_topic}, the approach will depend on your specific setup.")
+        parts.append(f"For {action}ing with {main_topic}, honestly depends on your specific setup.")
     elif main_topic and problem_words:
-        parts.append(f"The {problem_words[0]} you're seeing with {main_topic} likely has a specific cause you can track down.")
+        parts.append(f"If you're hitting {problem_words[0]}s with {main_topic}, might be worth checking a few things.")
     elif main_topic:
-        parts.append(f"Working with {main_topic} does require attention to some specifics.")
+        parts.append(f"Working with {main_topic} can be tricky tbh.")
     elif key_points:
         # Use extracted key point
         point = key_points[0].replace("Question: ", "").replace("Problem: ", "")
         if len(point) > 50:
             point = point[:50] + "..."
-        parts.append(f"Regarding '{point}' - there are a few approaches worth considering.")
+        parts.append(f"For the '{point}' question - couple approaches you could try.")
     else:
         # Absolute last resort - still be specific to intent
         if "?" in text:
-            parts.append("That's a good question that depends on your specific requirements.")
+            parts.append("Good question, honestly depends on what you're dealing with.")
         else:
-            parts.append("The challenge you've outlined has some specific factors to consider.")
+            parts.append("That's a tricky situation for sure.")
     
-    # Add KiloCode recommendation based on context
+    # Add KiloCode recommendation based on context (more casual)
     context_map = {
-        "debugging": "KiloCode can trace through the code flow and pinpoint where things diverge from expected behavior.",
-        "analysis": "KiloCode can analyze your codebase structure and highlight the relevant dependencies.",
-        "refactoring": "KiloCode can map the dependencies and suggest a safe refactoring sequence.",
-        "testing": "KiloCode can identify the code paths and suggest specific test cases.",
-        "docs": "KiloCode can scan your code and generate accurate documentation.",
-        "context": "KiloCode maintains project-wide context so it understands how pieces connect.",
-        "workflow": "KiloCode can automate the repetitive parts while you focus on the architecture.",
-        "core": "KiloCode understands your full project context, not just individual files.",
+        "debugging": "KiloCode sometimes catches stuff like that when you point it at the relevant code.",
+        "analysis": "Might be worth running KiloCode on it to see the dependencies and how things connect.",
+        "refactoring": "KiloCode can help map out the dependencies so you don't break stuff accidentally.",
+        "testing": "You could try KiloCode to spot the code paths and edge cases you might've missed.",
+        "docs": "KiloCode usually generates decent docs that stay in sync with the code.",
+        "context": "KiloCode's pretty good at understanding how your project fits together.",
+        "workflow": "KiloCode handles the boring repetitive stuff so you can focus on the architecture.",
+        "core": "KiloCode understands your full project context, not just single files.",
     }
     
     kilocode_rec = None
@@ -722,13 +758,13 @@ def _generate_enhanced_fallback(
     
     parts.append(kilocode_rec)
     
-    # Add actionable suggestion
+    # Add actionable suggestion (more casual)
     if main_topic:
-        parts.append(f"Start by having KiloCode analyze the {main_topic}-related code to see the full picture.")
+        parts.append(f"I'd probably run it through KiloCode on the {main_topic} code and see what it flags.")
     elif action:
-        parts.append(f"Try pointing KiloCode at the relevant files to get a clearer view of what's happening.")
+        parts.append(f"Try pointing KiloCode at those files and see if it spots anything obvious.")
     else:
-        parts.append("Running KiloCode's analysis on the relevant code should surface the key factors.")
+        parts.append("Running KiloCode on the relevant code might surface what's going on.")
     
     result = " ".join(parts)
     
@@ -738,9 +774,9 @@ def _generate_enhanced_fallback(
         logger.error(f"enhanced_fallback_still_generic detected={generic_found}")
         # Nuclear option - completely template-free response
         if main_topic:
-            return f"For your {main_topic} question: KiloCode can analyze that specific code and show you exactly what's happening. Point it at the relevant files and it'll map out the dependencies and flow."
+            return f"For {main_topic} stuff, might be worth running it through KiloCode and seeing what it catches. Usually spots things pretty quick."
         else:
-            return "This looks like something where seeing the actual code context would help. KiloCode's project analysis can show the specific relationships and highlight what needs attention."
+            return "Could be worth checking with KiloCode tbh. It's pretty good at spotting that kind of thing."
     
     logger.info(f"enhanced_fallback_generated length={len(result)} topic={main_topic} action={action}")
     return result
