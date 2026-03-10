@@ -221,14 +221,122 @@ def _check_generic_phrases(comment: str) -> Tuple[bool, List[str]]:
     return is_specific, detected
 
 
+# Known AI models that are commonly mentioned in developer discussions
+KNOWN_AI_MODELS = [
+    "opus", "sonnet", "haiku", "claude", "gpt-4", "gpt-4o", "gpt-3.5", "gpt",
+    "kimi", "minimax", "gemini", "llama", "mistral", "codestral", "deepseek",
+    "qwen", "yi", "phi", "starling", "openchat", "zephyr", "mixtral",
+    "o1", "o1-preview", "o1-mini", "cursor", "aider", "copilot", "codex",
+]
+
+# Known developer tools commonly discussed
+KNOWN_TOOLS = [
+    "vscode", "vim", "neovim", "emacs", "jetbrains", "intellij", "pycharm",
+    "docker", "kubernetes", "k8s", "terraform", "ansible", "jenkins",
+    "github", "gitlab", "bitbucket", "git", "npm", "yarn", "pip", "poetry",
+    "webpack", "vite", "esbuild", "babel", "typescript", "javascript",
+    "react", "vue", "angular", "svelte", "next.js", "nextjs", "sveltekit",
+    "python", "node", "nodejs", "rust", "go", "golang", "java", "kotlin",
+    "postgres", "postgresql", "mysql", "mongodb", "redis", "sqlite",
+    "aws", "azure", "gcp", "vercel", "netlify", "heroku", "render",
+    "langchain", "llamaindex", "pinecone", "weaviate", "chromadb",
+]
+
+# Workflow/approach keywords
+WORKFLOW_KEYWORDS = [
+    "tdd", "bdd", "ci/cd", "cicd", "devops", "agile", "scrum",
+    "microservices", "monolith", "serverless", "mvc", "mvvm",
+    "pair programming", "code review", "pr review", "pull request",
+    "refactoring", "migration", "testing", "unit test", "integration test",
+    "debugging", "profiling", "optimization", "scaling", "deployment",
+]
+
+
+def _extract_specific_entities(post_title: str, post_content: str) -> Dict[str, List[str]]:
+    """
+    Extract specific entities mentioned in the post for context relevance.
+    
+    This extracts:
+    - AI models mentioned (Opus, Sonnet, GPT, Kimi, etc.)
+    - Tools mentioned (VSCode, Docker, etc.)
+    - Workflows/approaches mentioned
+    - Specific coding approaches
+    
+    Returns:
+        Dict with keys: 'models', 'tools', 'workflows', 'technologies', 'problems'
+    """
+    text = (post_title + " " + post_content).lower()
+    entities = {
+        "models": [],
+        "tools": [],
+        "workflows": [],
+        "technologies": [],
+        "problems": [],
+    }
+    
+    # Extract AI models mentioned
+    for model in KNOWN_AI_MODELS:
+        if model in text:
+            entities["models"].append(model)
+    
+    # Extract tools mentioned
+    for tool in KNOWN_TOOLS:
+        if tool in text:
+            entities["tools"].append(tool)
+    
+    # Extract workflow keywords
+    for workflow in WORKFLOW_KEYWORDS:
+        if workflow in text:
+            entities["workflows"].append(workflow)
+    
+    # Extract additional technologies (capitalized terms)
+    tech_terms = re.findall(r'\b([A-Z][a-zA-Z]+(?:\.?[a-zA-Z]+)?)\b', post_title + " " + post_content)
+    tech_terms = [t.lower() for t in tech_terms if len(t) > 2 and t.lower() not in
+                  {'the', 'this', 'that', 'when', 'where', 'what', 'have', 'been', 'just', 'can', 'will', 'with', 'from', 'they', 'their', 'there'}]
+    entities["technologies"] = list(set(tech_terms))[:8]
+    
+    # Extract problem indicators
+    problem_patterns = [
+        r"(having trouble with [^.]+)",
+        r"(struggling with [^.]+)",
+        r"(can't figure out [^.]+)",
+        r"(error[s]? (?:when|with|in) [^.]+)",
+        r"(issue[s]? (?:when|with|in) [^.]+)",
+        r"(problem[s]? (?:with|in|when) [^.]+)",
+        r"(bug[s]? (?:in|with) [^.]+)",
+        r"(crash(?:ing|ed)? (?:when|in|with) [^.]+)",
+        r"(fail(?:ing|ed)? (?:when|to|in) [^.]+)",
+    ]
+    for pattern in problem_patterns:
+        matches = re.findall(pattern, text)
+        for m in matches[:2]:
+            entities["problems"].append(m.strip())
+    
+    return entities
+
+
 def _extract_key_points(post_title: str, post_content: str, max_points: int = 5) -> List[str]:
     """
     Extract key points/topics from the post for specificity reference.
+    
+    Enhanced to include specific entities (models, tools, workflows).
     
     Returns a list of key phrases/topics mentioned in the post.
     """
     text = post_title + " " + post_content
     key_points = []
+    
+    # Extract specific entities first (most important for relevance)
+    entities = _extract_specific_entities(post_title, post_content)
+    
+    if entities["models"]:
+        key_points.append(f"AI Models mentioned: {', '.join(entities['models'][:5])}")
+    
+    if entities["tools"]:
+        key_points.append(f"Tools mentioned: {', '.join(entities['tools'][:5])}")
+    
+    if entities["workflows"]:
+        key_points.append(f"Workflows/approaches: {', '.join(entities['workflows'][:3])}")
     
     # Extract questions
     questions = re.findall(r'([^.!?]*\?)', text)
@@ -241,21 +349,24 @@ def _extract_key_points(post_title: str, post_content: str, max_points: int = 5)
     tech_terms = re.findall(r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\b', text)
     tech_terms = [t for t in tech_terms if len(t) > 3 and t.lower() not in
                   {'the', 'this', 'that', 'when', 'where', 'what', 'have', 'been', 'just'}]
-    if tech_terms:
+    if tech_terms and not entities["technologies"]:
         key_points.append(f"Technologies/topics: {', '.join(list(set(tech_terms))[:5])}")
     
     # Extract problem indicators
-    problem_patterns = [
-        r"(having trouble with [^.]+)",
-        r"(struggling with [^.]+)",
-        r"(can't figure out [^.]+)",
-        r"(error[s]? (?:when|with|in) [^.]+)",
-        r"(issue[s]? (?:when|with|in) [^.]+)",
-    ]
-    for pattern in problem_patterns:
-        matches = re.findall(pattern, text.lower())
-        for m in matches[:1]:
-            key_points.append(f"Problem: {m}")
+    if entities["problems"]:
+        key_points.append(f"Problem: {entities['problems'][0]}")
+    else:
+        problem_patterns = [
+            r"(having trouble with [^.]+)",
+            r"(struggling with [^.]+)",
+            r"(can't figure out [^.]+)",
+            r"(error[s]? (?:when|with|in) [^.]+)",
+            r"(issue[s]? (?:when|with|in) [^.]+)",
+        ]
+        for pattern in problem_patterns:
+            matches = re.findall(pattern, text.lower())
+            for m in matches[:1]:
+                key_points.append(f"Problem: {m}")
     
     return key_points[:max_points]
 
@@ -329,11 +440,21 @@ def _build_system_prompt() -> str:
     return """You are a developer casually replying to another developer on Reddit. Write naturally and conversationally.
 
 CRITICAL REQUIREMENTS (violations = rejection):
-1. Your comment MUST directly reference 2+ specific details from the Reddit post (exact problem, technology, error, or context mentioned)
+1. Your comment MUST directly reference SPECIFIC entities mentioned in the post:
+   - AI models (e.g., "Opus", "Sonnet", "GPT-4", "Kimi", "MiniMax", "Claude")
+   - Tools (e.g., "VSCode", "Docker", "React", "Python", "Next.js")
+   - Workflows/approaches (e.g., "TDD", "CI/CD", "microservices", "refactoring")
+   - The exact problem or question being discussed
 2. Your comment MUST mention "KiloCode" casually as a relevant tool (NOT like a product pitch)
 3. Your comment MUST provide actionable advice (not vague suggestions)
 4. Your comment MUST be 2-4 sentences (200-600 characters)
 5. Your comment MUST sound natural and conversational, like a developer casually helping out
+
+CONTEXT RELEVANCE RULES:
+- If the post mentions "Opus" or "Sonnet", your comment should reference those models
+- If the post discusses a specific tool like "VSCode" or "Docker", mention it
+- If the post is about a workflow like "TDD" or "debugging", speak to that
+- NEVER ignore what the post is specifically about - respond to THEIR topic
 
 NATURAL REDDIT TONE:
 - Use casual phrases naturally: "tbh", "honestly", "imo", "might be worth", "pretty solid", "kinda"
@@ -360,28 +481,29 @@ ABSOLUTELY FORBIDDEN (instant rejection):
 - "seamless integration" or marketing buzzwords
 - "analyze systematically" or vague process descriptions
 - "Interesting discussion", "Thanks for sharing", "Great post"
+- "Great question" or "Good point" without specific context
 - Any corporate or promotional language
 - Emojis of any kind
 - Generic statements that could apply to any post
 
 REQUIRED STRUCTURE:
-1. Opening: Acknowledge the SPECIFIC problem naturally (like you're responding to a friend)
-2. Body: Mention KiloCode casually as something that might help (be concrete but conversational)
-3. Brief actionable tip: One specific thing they can try
+1. Opening: Reference the SPECIFIC model/tool/workflow they mentioned (like responding to a friend)
+2. Body: Mention KiloCode casually as something that might help with THEIR specific situation
+3. Brief actionable tip: One specific thing they can try for THEIR problem
+
+GOOD EXAMPLE (for a post comparing "Opus vs Sonnet for coding"):
+"Honestly both Opus and Sonnet are pretty solid for coding tasks, but Opus tends to handle more complex refactoring better. Might be worth running your codebase through KiloCode to see which model catches more issues in your specific setup."
 
 GOOD EXAMPLE (for a post about "React useEffect dependency array warnings"):
 "If you're running into dependency warnings a lot, might be worth running those hooks through KiloCode. It sometimes catches stuff that's causing extra renders you didn't expect."
 
-ANOTHER GOOD EXAMPLE (for debugging errors):
-"Could be something weird in the environment tbh. Might be worth running KiloCode on it and seeing if it spots any dependency conflicts."
+GOOD EXAMPLE (for a post about "debugging Docker container issues"):
+"Docker networking can be a pain to debug tbh. Might be worth running KiloCode on your compose file and seeing if it spots any config issues with the container setup."
 
-BAD EXAMPLE (rejected - too formal/promotional):
-"This is something many developers encounter when working with React. KiloCode can help analyze the problem systematically and suggest solutions. It's particularly useful when manual inspection would be time-consuming."
+BAD EXAMPLE (rejected - doesn't reference specific entities):
+"This is something many developers encounter when working with these tools. KiloCode can help analyze the problem systematically and suggest solutions."
 
-BAD EXAMPLE (rejected - corporate tone):
-"KiloCode provides advanced capabilities for analyzing React applications. Our tool offers a comprehensive solution for dependency management and optimization."
-
-The BAD examples will be REJECTED because they sound like marketing copy, not a developer casually helping."""
+The BAD example will be REJECTED because it doesn't mention the specific tools/models from the post and sounds like marketing copy."""
 
 
 def _build_user_prompt(
@@ -416,9 +538,39 @@ def _build_user_prompt(
     prompt_parts.append(f"Title: {post_title}")
     prompt_parts.append(f"\nPost Content:\n{post_content[:2000]}")  # Increased limit
     
-    # Section 2: Extracted Key Points (for specificity)
+    # Section 2: Extracted Entities (CRITICAL for context relevance)
+    entities = _extract_specific_entities(post_title, post_content)
+    
+    prompt_parts.append("\n\n=== ENTITIES YOU MUST REFERENCE ===")
+    
+    if entities["models"]:
+        prompt_parts.append("AI MODELS mentioned (reference these by name):")
+        for model in entities["models"][:5]:
+            prompt_parts.append(f"  - {model}")
+    
+    if entities["tools"]:
+        prompt_parts.append("Tools/Technologies mentioned (reference these):")
+        for tool in entities["tools"][:5]:
+            prompt_parts.append(f"  - {tool}")
+    
+    if entities["workflows"]:
+        prompt_parts.append("Workflows/Approaches mentioned:")
+        for workflow in entities["workflows"][:3]:
+            prompt_parts.append(f"  - {workflow}")
+    
+    if entities["problems"]:
+        prompt_parts.append("Problems described:")
+        for problem in entities["problems"][:2]:
+            prompt_parts.append(f"  - {problem}")
+    
+    # Add explicit instruction about referencing
+    entity_count = len(entities["models"]) + len(entities["tools"]) + len(entities["workflows"])
+    if entity_count > 0:
+        prompt_parts.append(f"\n⚠️ Your comment MUST explicitly mention at least 1-2 of these entities by name.")
+    
+    # Section 3: Extracted Key Points (for specificity)
     if key_points:
-        prompt_parts.append("\n\n=== KEY POINTS TO ADDRESS ===")
+        prompt_parts.append("\n=== KEY POINTS TO ADDRESS ===")
         prompt_parts.append("Your comment MUST reference at least 2 of these specific points:")
         for i, point in enumerate(key_points, 1):
             prompt_parts.append(f"{i}. {point}")
@@ -426,12 +578,12 @@ def _build_user_prompt(
         # Extract key points on the fly
         auto_key_points = _extract_key_points(post_title, post_content)
         if auto_key_points:
-            prompt_parts.append("\n\n=== KEY POINTS TO ADDRESS ===")
+            prompt_parts.append("\n=== KEY POINTS TO ADDRESS ===")
             prompt_parts.append("Your comment MUST reference at least 2 of these specific points:")
             for i, point in enumerate(auto_key_points, 1):
                 prompt_parts.append(f"{i}. {point}")
     
-    # Section 3: KiloCode Context (always included)
+    # Section 4: KiloCode Context (always included)
     prompt_parts.append("\n\n=== KILOCODE CAPABILITIES (use these for specific recommendations) ===")
     if doc_context:
         prompt_parts.append(doc_context[:1000])
@@ -444,14 +596,14 @@ def _build_user_prompt(
     if style_examples:
         prompt_parts.append(f"\n\n=== EXAMPLE COMMENT STYLE ===\n{style_examples[:500]}")
     
-    # Section 4: Task Instruction
+    # Section 5: Task Instruction
     prompt_parts.append("\n\n=== YOUR TASK ===")
     
     if is_retry:
         prompt_parts.append(f"⚠️ PREVIOUS ATTEMPT REJECTED: {retry_reason}")
         prompt_parts.append("""
 Write a NEW comment that fixes this issue. Remember:
-1. Reference SPECIFIC details from the post (the actual tech/error/problem they mentioned)
+1. Reference SPECIFIC entities from the post (the actual models/tools/workflows they mentioned BY NAME)
 2. Mention KiloCode casually as something that might help (NOT like marketing)
 3. Give ONE concrete thing they can try
 4. Use 2-4 sentences (200-600 chars)
@@ -462,10 +614,18 @@ BANNED PHRASES (instant rejection):
 - "comprehensive solution"
 - "advanced capabilities"
 - "analyze systematically"
+- "Interesting discussion", "Great post", "Thanks for sharing"
 - Any corporate/marketing language""")
     else:
-        prompt_parts.append("""Write a casual Reddit reply that:
-1. References the SPECIFIC problem/tech they mentioned (not generic acknowledgment)
+        # Build dynamic instruction based on detected entities
+        entity_instruction = ""
+        if entities["models"]:
+            entity_instruction += f" Reference models like '{entities['models'][0]}' "
+        if entities["tools"]:
+            entity_instruction += f" Mention tools like '{entities['tools'][0]}' "
+        
+        prompt_parts.append(f"""Write a casual Reddit reply that:
+1. References the SPECIFIC entities they mentioned by name{entity_instruction}
 2. Mentions KiloCode casually - like "might be worth trying KiloCode" or "KiloCode usually spots that"
 3. Gives ONE actionable tip they can try
 4. Sounds conversational and natural (2-4 sentences, 200-600 chars)
@@ -681,21 +841,29 @@ def _generate_enhanced_fallback(
     Generate an enhanced fallback comment when Gemini generation fails.
     
     This is NOT the generic fallback - it creates a specific comment using:
-    - Extracted key points from the post
+    - Extracted entities (models, tools, workflows) from the post
     - Relevant KiloCode context
     - Specific language tied to the post content
     
     This should NEVER produce "many developers encounter" style output.
     """
-    # Extract specific details from the post
+    # Extract specific entities from the post
+    entities = _extract_specific_entities(post_title, post_content)
     text = post_title + " " + post_content
     
-    # Find the main topic/technology mentioned
-    tech_terms = re.findall(r'\b([A-Z][a-zA-Z]+(?:\.?[a-zA-Z]+)?)\b', text)
-    tech_terms = [t for t in tech_terms if len(t) > 2 and t.lower() not in
-                  {'the', 'this', 'that', 'when', 'where', 'what', 'have', 'been', 'just', 'can', 'will'}]
+    # Determine the primary entity to reference
+    primary_entity = None
+    entity_type = None
     
-    main_topic = tech_terms[0] if tech_terms else None
+    if entities["models"]:
+        primary_entity = entities["models"][0].upper() if entities["models"][0] in ["opus", "sonnet", "haiku", "gpt", "o1"] else entities["models"][0].title()
+        entity_type = "model"
+    elif entities["tools"]:
+        primary_entity = entities["tools"][0].title()
+        entity_type = "tool"
+    elif entities["workflows"]:
+        primary_entity = entities["workflows"][0].upper() if entities["workflows"][0] in ["tdd", "bdd", "ci/cd", "cicd"] else entities["workflows"][0].title()
+        entity_type = "workflow"
     
     # Find specific problem words
     problem_words = []
@@ -707,15 +875,25 @@ def _generate_enhanced_fallback(
     action_match = re.search(r'(trying to|want to|need to|how to|can\'t|cannot|unable to) (\w+)', text.lower())
     action = action_match.group(2) if action_match else None
     
-    # Build specific opening based on detected content (more casual)
+    # Build specific opening based on detected entities (more casual)
     parts = []
     
-    if main_topic and action:
-        parts.append(f"For {action}ing with {main_topic}, honestly depends on your specific setup.")
-    elif main_topic and problem_words:
-        parts.append(f"If you're hitting {problem_words[0]}s with {main_topic}, might be worth checking a few things.")
-    elif main_topic:
-        parts.append(f"Working with {main_topic} can be tricky tbh.")
+    # Opening: Reference specific entities from the post
+    if entity_type == "model" and entities["models"]:
+        models_str = ", ".join([m.upper() if m in ["opus", "sonnet", "haiku", "gpt", "o1"] else m.title() for m in entities["models"][:2]])
+        if len(entities["models"]) > 1:
+            parts.append(f"Both {models_str} are pretty solid tbh.")
+        else:
+            parts.append(f"Working with {primary_entity} can be interesting.")
+        if problem_words:
+            parts.append(f"If you're hitting {problem_words[0]}s with it, might be worth a closer look.")
+    elif entity_type == "tool" and entities["tools"]:
+        if problem_words:
+            parts.append(f"Dealing with {problem_words[0]}s in {primary_entity} can be tricky tbh.")
+        else:
+            parts.append(f"Working with {primary_entity} - couple things to keep in mind.")
+    elif entity_type == "workflow":
+        parts.append(f"For {primary_entity} stuff, honestly depends on your specific setup.")
     elif key_points:
         # Use extracted key point
         point = key_points[0].replace("Question: ", "").replace("Problem: ", "")
@@ -758,9 +936,9 @@ def _generate_enhanced_fallback(
     
     parts.append(kilocode_rec)
     
-    # Add actionable suggestion (more casual)
-    if main_topic:
-        parts.append(f"I'd probably run it through KiloCode on the {main_topic} code and see what it flags.")
+    # Add actionable suggestion referencing the specific entity
+    if primary_entity:
+        parts.append(f"Might be worth running KiloCode on your {primary_entity} setup to see what it catches.")
     elif action:
         parts.append(f"Try pointing KiloCode at those files and see if it spots anything obvious.")
     else:
@@ -773,12 +951,12 @@ def _generate_enhanced_fallback(
     if not is_specific:
         logger.error(f"enhanced_fallback_still_generic detected={generic_found}")
         # Nuclear option - completely template-free response
-        if main_topic:
-            return f"For {main_topic} stuff, might be worth running it through KiloCode and seeing what it catches. Usually spots things pretty quick."
+        if primary_entity:
+            return f"For {primary_entity} stuff, might be worth running it through KiloCode and seeing what it catches. Usually spots things pretty quick."
         else:
             return "Could be worth checking with KiloCode tbh. It's pretty good at spotting that kind of thing."
     
-    logger.info(f"enhanced_fallback_generated length={len(result)} topic={main_topic} action={action}")
+    logger.info(f"enhanced_fallback_generated length={len(result)} entity={primary_entity} entity_type={entity_type}")
     return result
 
 
